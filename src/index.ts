@@ -42,14 +42,11 @@ class App {
   resize = () => {
     let {camera, renderer} = this;
     let {style} = renderer.domElement;
-    renderer.setSize(0, 0);
-    setTimeout(() => {
-      let {height, width} = this.display.getBoundingClientRect();
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      this.render();
-    }, 0);
+    let {height, width} = this.display.getBoundingClientRect();
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    this.render();
   };
 
   scene = new Scene();

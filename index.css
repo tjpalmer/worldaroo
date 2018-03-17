@@ -11,3 +11,8 @@ body {
   right: 0;
   top: 0;
 }
+
+.display {
+  overflow: hidden;
+  position: relative;
+}
