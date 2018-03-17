@@ -12,6 +12,6 @@
   },
   "scripts": {
     "prepare": "parcel build index.html --out-dir docs --public-url ./",
-    "start": "parcel index.html --out-dir dev"
+    "start": "parcel index.html --out-dir bin"
   }
 }
