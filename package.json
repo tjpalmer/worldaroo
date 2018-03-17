@@ -1,0 +1,17 @@
+{
+  "name": "worldaroo",
+  "version": "0.0.1",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.91.0",
+    "typescript": "^2.7.2"
+  },
+  "devDependencies": {
+    "@types/three": "^0.89.12",
+    "parcel-bundler": "^1.6.2"
+  },
+  "scripts": {
+    "prepare": "parcel build index.html --out-dir docs --public-url ./",
+    "start": "parcel index.html --out-dir dev"
+  }
+}
