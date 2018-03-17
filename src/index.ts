@@ -12,10 +12,12 @@ class App {
   constructor() {
     let {camera, scene} = this;
     // Display.
-    this.display = document.querySelector('.display') as HTMLElement;
-    this.renderer = new WebGLRenderer({
-      canvas: this.display.querySelector('canvas')!,
+    let display = this.display =
+      document.querySelector('.display') as HTMLElement;
+    let renderer = this.renderer = new WebGLRenderer({
+      antialias: true, canvas: display.querySelector('canvas')!,
     });
+    renderer.setClearColor(getComputedStyle(display).backgroundColor!);
     // Scene.
     let geometry = new BoxGeometry(0.2, 0.2, 0.2);
     let material = new MeshNormalMaterial();
