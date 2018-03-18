@@ -1,7 +1,7 @@
 import {buildSkeleton} from './';
 import {
-  BoxGeometry, Mesh, MeshNormalMaterial, PerspectiveCamera, Scene,
-  WebGLRenderer,
+  AmbientLight, BoxGeometry, DirectionalLight, Mesh, MeshNormalMaterial,
+  PerspectiveCamera, Scene, WebGLRenderer,
 } from 'three';
 
 export class App {
@@ -23,15 +23,21 @@ export class App {
     // mesh.add(bone);
     scene.add(helper);
     scene.add(mesh);
+    // Light.
+    let light = new DirectionalLight(0xffffff, 2.5);
+    light.position.set(1, 1, 1);
+    scene.add(light);
+    scene.add(new AmbientLight(0xffffff, 0.3));
     // Camera.
-    camera.position.z = 1;
+    camera.position.set(0, 1, 2);
+    camera.lookAt(0, 1, 0);
     this.resize();
     addEventListener('resize', this.resize);
   }
 
   display: HTMLElement;
 
-  camera = new PerspectiveCamera(70, 1, 0.01, 10);
+  camera = new PerspectiveCamera(70, 1, 0.01, 100);
 
   render() {
     this.renderer.render(this.scene, this.camera);
