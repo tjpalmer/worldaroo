@@ -1,6 +1,6 @@
 import {
-  Bone, BoxGeometry, Geometry, MeshPhysicalMaterial, Skeleton, SkeletonHelper,
-  SkinnedMesh, Vector4, Matrix4,
+  Bone, Geometry, MeshPhysicalMaterial, Skeleton, SkeletonHelper, SkinnedMesh,
+  SphereGeometry, Vector4, Matrix4, Vector3,
 } from "three";
 
 export function buildSkeleton() {
@@ -14,17 +14,23 @@ export function buildSkeleton() {
   positions.forEach((y, i) => {
     let bone = new (Bone as any)() as Bone;
     if (prevBone) {
-      bone.position.y = y - positions[i - 1];
+      let length = positions[i - 1] - y;
+      bone.position.y = -length;
       prevBone.add(bone);
       // Geometry.
-      let box = new BoxGeometry(0.2, -bone.position.y, 0.2);
+      let box = new SphereGeometry(length / 2, 4, 2);
       // Work around typing problem again.
       // let skinIndices = box.skinIndices as any as Array<Vector4>;
       // let skinWeights = box.skinWeights as any as Array<Vector4>;
       // box.vertices.forEach(vertex => {
       //   //
       // });
-      geometry.merge(box, matrix.makeTranslation(0, positions[i] - bone.position.y / 2, 0))
+      geometry.merge(
+        box,
+        matrix.
+          makeTranslation(0, positions[i] + length / 2, 0).
+          scale(new Vector3(0.3, 1, 0.3)),
+      );
     } else {
       bone.position.y = y;
     }
