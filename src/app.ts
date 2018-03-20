@@ -23,11 +23,12 @@ export class App {
     // mesh.add(bone);
     scene.add(helper);
     scene.add(mesh);
+    // TODO Ground platform.
     // Light.
-    let light = new DirectionalLight(0xffffff, 2.5);
-    light.position.set(1, 1, 1);
+    let light = new DirectionalLight(0xffffff, 2);
+    light.position.set(-1, 1, 1);
     scene.add(light);
-    scene.add(new AmbientLight(0xffffff, 0.3));
+    scene.add(new AmbientLight(0xffffff, 0.5));
     // Camera.
     camera.position.set(0, 1, 2);
     camera.lookAt(0, 1, 0);
