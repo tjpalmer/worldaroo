@@ -15,7 +15,9 @@ import * as THREE from 'three';
 //    Zoom - middle mouse, or mousewheel / touch: two finger spread or squish
 //    Pan - right mouse, or arrow keys / touch: three finger swipe
 
-export const OrbitControls = function (this: any, object: THREE.PerspectiveCamera, domElement?: Node ) {
+type Camera = THREE.OrthographicCamera | THREE.PerspectiveCamera;
+
+export const OrbitControls = function (this: any, object: Camera, domElement?: Node ) {
 
 	this.object = object;
 

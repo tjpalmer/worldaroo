@@ -32,7 +32,7 @@ export class App {
     // Camera.
     camera.position.set(0, 1, 2);
     camera.lookAt(0, 1, 0);
-    this.control = new OrbitControls(camera);
+    this.control = new (OrbitControls as any)(camera);
     this.control.target = new Vector3(0, 1, 0);
     this.control.update();
     this.resize();
@@ -46,7 +46,7 @@ export class App {
 
   camera = new PerspectiveCamera(70, 1, 0.01, 100);
 
-  control: OrbitControls;
+  control: any;
 
   render() {
     this.renderer.render(this.scene, this.camera);
