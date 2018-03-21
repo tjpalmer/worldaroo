@@ -1,7 +1,7 @@
-import {buildSkeleton} from './';
+import {buildSkeleton, OrbitControls} from './';
 import {
   AmbientLight, BoxGeometry, DirectionalLight, Mesh, MeshNormalMaterial,
-  PerspectiveCamera, Scene, WebGLRenderer,
+  PerspectiveCamera, Scene, Vector3, WebGLRenderer,
 } from 'three';
 
 export class App {
@@ -32,13 +32,21 @@ export class App {
     // Camera.
     camera.position.set(0, 1, 2);
     camera.lookAt(0, 1, 0);
+    this.control = new OrbitControls(camera);
+    this.control.target = new Vector3(0, 1, 0);
+    this.control.update();
     this.resize();
     addEventListener('resize', this.resize);
+    addEventListener('mousedrag', this.update);
+    addEventListener('mousemove', this.update);
+    document.addEventListener('wheel', this.update);
   }
 
   display: HTMLElement;
 
   camera = new PerspectiveCamera(70, 1, 0.01, 100);
+
+  control: OrbitControls;
 
   render() {
     this.renderer.render(this.scene, this.camera);
@@ -57,5 +65,10 @@ export class App {
   };
 
   scene = new Scene();
+
+  update = () => {
+    this.control.update();
+    this.render();
+  };
 
 }
