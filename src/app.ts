@@ -1,8 +1,8 @@
 import {buildSkeleton, EditableBone, OrbitControls} from './';
 import {
-  AmbientLight, BoxGeometry, DirectionalLight, Mesh, MeshPhysicalMaterial,
-  Object3D, PerspectiveCamera, Raycaster, Scene, Vector2, Vector3,
-  WebGLRenderer,
+  AmbientLight, BoxGeometry, Color, DirectionalLight, Mesh,
+  MeshPhysicalMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Raycaster,
+  Scene, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 
 export class App {
@@ -19,7 +19,14 @@ export class App {
     // Scene.
     let body = this.body = buildSkeleton();
     scene.add(body);
-    // TODO Ground platform.
+    // Simple floor for size and place context for now.
+    let floorGeometry = new PlaneGeometry(1, 1);
+    let floorMaterial = new MeshPhysicalMaterial({
+      color: new Color().setHSL(1.2/3, 0.5, 0.5),
+    });
+    // TODO An outline version from underneath??
+    let floor = new Mesh(floorGeometry, floorMaterial).rotateX(-Math.PI / 2);
+    scene.add(floor);
     // Light.
     let light = new DirectionalLight(0xffffff, 2);
     light.position.set(-1, 1, 1);
@@ -78,9 +85,10 @@ export class App {
 
   press = (event: MouseEvent) => {
     let object = this.intersect(event);
-    this.controlCamera = !object;
+    this.controlCamera = true;
     type Physical = {material: MeshPhysicalMaterial};
     check: if (object && object.parent instanceof EditableBone) {
+      this.controlCamera = false;
       let bone = object.parent;
       if (this.focus) {
         if (this.focus == object) {
@@ -93,6 +101,7 @@ export class App {
       material.color.setHSL(1/6, 1, 0.7);
       this.focus = object;
     }
+    this.update();
   };
 
   render() {
