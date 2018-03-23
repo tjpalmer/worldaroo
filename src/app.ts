@@ -19,10 +19,11 @@ export class App {
     // let geometry = new BoxGeometry(0.2, 0.2, 0.2);
     // let material = new MeshNormalMaterial();
     // let mesh = new Mesh(geometry, material);
-    let [mesh, helper] = buildSkeleton();
+    let [mesh, helper, ebody] = buildSkeleton();
     // mesh.add(bone);
     scene.add(helper);
     scene.add(mesh);
+    scene.add(ebody);
     // TODO Ground platform.
     // Light.
     let light = new DirectionalLight(0xffffff, 2);
