@@ -16,14 +16,8 @@ export class App {
     });
     renderer.setClearColor(getComputedStyle(display).backgroundColor!);
     // Scene.
-    // let geometry = new BoxGeometry(0.2, 0.2, 0.2);
-    // let material = new MeshNormalMaterial();
-    // let mesh = new Mesh(geometry, material);
-    let [mesh, helper, ebody] = buildSkeleton();
-    // mesh.add(bone);
-    scene.add(helper);
-    scene.add(mesh);
-    scene.add(ebody);
+    let body = buildSkeleton();
+    scene.add(body);
     // TODO Ground platform.
     // Light.
     let light = new DirectionalLight(0xffffff, 2);
