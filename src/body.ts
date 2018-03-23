@@ -1,21 +1,23 @@
 import {
-  Bone, Color, Geometry, Group, Mesh, MeshPhysicalMaterial, Skeleton,
-  SkeletonHelper, SkinnedMesh, SphereGeometry, Vector4, Matrix4, Vector3,
+  Color, Geometry, Group, Mesh, MeshPhysicalMaterial, SphereGeometry,
 } from "three";
 
-class EditableBone extends Group {
+export class EditableBone extends Group {
 
   constructor(length: number) {
     super();
+    // TODO Also add editor tools on hover.
     this.length = length;
     let radius = length / 2;
     let geometry = new SphereGeometry(radius, 4, 2).scale(0.3, 1, 0.3);
-    let color = new Color().setHSL(2/3, 0.1, 1/2);
+    let color = this.color = new Color().setHSL(2/3, 0.1, 1/2);
     let material = new MeshPhysicalMaterial({color, roughness: 0.75});
     let mesh = new Mesh(geometry, material);
     mesh.translateY(-radius);
     this.add(mesh);
   }
+
+  color: Color;
 
   length: number;
 
@@ -41,9 +43,9 @@ export function buildSkeleton() {
     prevBone = bone;
   });
   if (true) {
-    let rotations = [0.5, 0.5, 0.5, 0.5, -0.5, -0.25];
-    rotations.forEach((rotation, i) => {
-      bones[i].rotateZ(rotation);
+    let angles = [0.5, 0.5, 0.5, 0.5, -0.5, -0.25];
+    angles.forEach((angle, i) => {
+      bones[i].rotateZ(angle);
     })
   }
   return body;
