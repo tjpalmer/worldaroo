@@ -28,14 +28,17 @@ export class App {
     // Camera.
     camera.position.set(0, 1, 2);
     camera.lookAt(0, 1, 0);
+    // Custom listeners before camera control.
+    addEventListener('resize', this.resize);
+    addEventListener('mousedown', this.press);
+    addEventListener('mouseup', () => {this.controlCamera = false});
+    document.addEventListener('mousemove', this.hover);
+    document.addEventListener('wheel', this.update);
+    // Camera control.
     this.control = new (OrbitControls as any)(camera);
     this.control.target = new Vector3(0, 1, 0);
     this.control.update();
     this.resize();
-    addEventListener('resize', this.resize);
-    addEventListener('mousedrag', this.update);
-    addEventListener('mousemove', this.moved);
-    document.addEventListener('wheel', this.update);
   }
 
   body: Object3D;
@@ -46,9 +49,36 @@ export class App {
 
   control: any;
 
+  controlCamera = false;
+
   focus?: Object3D = undefined;
 
-  moved = (event: MouseEvent) => {
+  hover = (event: MouseEvent) => {
+    if (this.controlCamera) {
+      this.update();
+      return;
+    }
+    event.stopImmediatePropagation();
+    let object = this.intersect(event);
+    type Physical = {material: MeshPhysicalMaterial};
+    // console.log(event.buttons);
+    check: if (object && object.parent instanceof EditableBone) {
+      let bone = object.parent;
+      if (this.focus) {
+        if (this.focus == object) {
+          break check;
+        }
+        (this.focus as any as Physical).material.color.set(bone.color);
+      }
+      let {material} = (object as any as Physical);
+      let {color} = bone;
+      material.color.setHSL(1/6, 1, 0.7);
+      this.focus = object;
+    }
+    this.update();
+  };
+
+  intersect(event: MouseEvent) {
     let canvas = this.renderer.domElement;
     let mouse = new Vector2(event.clientX, event.clientY);
     mouse.divide(this.size);
@@ -57,24 +87,13 @@ export class App {
     let raycaster = new Raycaster();
     raycaster.setFromCamera(mouse, this.camera);
     let intersections = raycaster.intersectObject(this.scene, true);
-    type Physical = {material: MeshPhysicalMaterial};
-    check: if (intersections.length) {
-      let {object} = intersections[0];
-      if (object.parent instanceof EditableBone) {
-        let bone = object.parent;
-        if (this.focus) {
-          if (this.focus == object) {
-            break check;
-          }
-          (this.focus as any as Physical).material.color.set(bone.color);
-        }
-        let {material} = (object as any as Physical);
-        let {color} = bone;
-        material.color.setHSL(1/6, 1, 0.7);
-        this.focus = object;
-      }
+    if (intersections.length) {
+      return intersections[0].object;
     }
-    this.update();
+  }
+
+  press = (event: MouseEvent) => {
+    this.controlCamera = !this.intersect(event);
   };
 
   render() {
