@@ -54,14 +54,32 @@ export class App {
   focus?: Object3D = undefined;
 
   hover = (event: MouseEvent) => {
-    if (this.controlCamera) {
-      this.update();
-      return;
+    if (!this.controlCamera) {
+      event.stopImmediatePropagation();
     }
-    event.stopImmediatePropagation();
+    this.update();
+  };
+
+  intersect(event: MouseEvent) {
+    let canvas = this.renderer.domElement;
+    // Convert mouse to display space.
+    // TODO No temporary objects (except intersections, I guess).
+    let mouse = new Vector2(event.clientX, event.clientY);
+    mouse.divide(this.size);
+    mouse.multiplyScalar(2).addScalar(-1).multiply(new Vector2(1, -1));
+    // Find anything behind the mouse.
+    let raycaster = new Raycaster();
+    raycaster.setFromCamera(mouse, this.camera);
+    let intersections = raycaster.intersectObject(this.scene, true);
+    if (intersections.length) {
+      return intersections[0].object;
+    }
+  }
+
+  press = (event: MouseEvent) => {
     let object = this.intersect(event);
+    this.controlCamera = !object;
     type Physical = {material: MeshPhysicalMaterial};
-    // console.log(event.buttons);
     check: if (object && object.parent instanceof EditableBone) {
       let bone = object.parent;
       if (this.focus) {
@@ -75,25 +93,6 @@ export class App {
       material.color.setHSL(1/6, 1, 0.7);
       this.focus = object;
     }
-    this.update();
-  };
-
-  intersect(event: MouseEvent) {
-    let canvas = this.renderer.domElement;
-    let mouse = new Vector2(event.clientX, event.clientY);
-    mouse.divide(this.size);
-    mouse.multiplyScalar(2).addScalar(-1).multiply(new Vector2(1, -1));
-    // console.log(mouse);
-    let raycaster = new Raycaster();
-    raycaster.setFromCamera(mouse, this.camera);
-    let intersections = raycaster.intersectObject(this.scene, true);
-    if (intersections.length) {
-      return intersections[0].object;
-    }
-  }
-
-  press = (event: MouseEvent) => {
-    this.controlCamera = !this.intersect(event);
   };
 
   render() {
