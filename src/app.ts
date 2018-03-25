@@ -1,8 +1,9 @@
-import {buildSkeleton, EditableBone, OrbitControls} from './';
+import {Creature, EditorBody, EditorBone, OrbitControls} from './';
+import {Vec3} from 'cannon';
 import {
-  AmbientLight, BoxGeometry, Color, DirectionalLight, Mesh,
+  AmbientLight, BoxGeometry, Color, DirectionalLight, Matrix4, Mesh,
   MeshPhysicalMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Raycaster,
-  Scene, Vector2, Vector3, WebGLRenderer,
+  Scene, Vector2, Vector3, WebGLRenderer, Quaternion,
 } from 'three';
 
 export class App {
@@ -17,8 +18,8 @@ export class App {
     });
     renderer.setClearColor(getComputedStyle(display).backgroundColor!);
     // Scene.
-    let body = this.body = buildSkeleton();
-    scene.add(body);
+    let creature = this.creature = new Creature();
+    scene.add(creature);
     // Simple floor for size and place context for now.
     let floorGeometry = new PlaneGeometry(1, 1);
     let floorMaterial = new MeshPhysicalMaterial({
@@ -48,11 +49,11 @@ export class App {
     this.resize();
   }
 
-  body: Object3D;
+  creature: Creature;
 
   display: HTMLElement;
 
-  camera = new PerspectiveCamera(70, 1, 0.01, 100);
+  camera = new PerspectiveCamera(60, 1, 0.01, 100);
 
   control: any;
 
@@ -87,15 +88,23 @@ export class App {
     let object = this.intersect(event);
     this.controlCamera = true;
     type Physical = {material: MeshPhysicalMaterial};
-    check: if (object && object.parent instanceof EditableBone) {
+    check: if (object && object.parent instanceof EditorBone) {
       this.controlCamera = false;
       let bone = object.parent;
+      let kick = (scale: number) => {
+        bone.body.applyImpulse(
+          new Vec3(0.1 * scale, 0, 0),
+          new Vec3().copy(bone.getWorldPosition(new Vector3()) as any),
+        );
+      }
       if (this.focus) {
         if (this.focus == object) {
+          kick(-1.1);
           break check;
         }
         (this.focus as any as Physical).material.color.set(bone.color);
       }
+      kick(1);
       let {material} = (object as any as Physical);
       let {color} = bone;
       material.color.setHSL(1/6, 1, 0.7);
@@ -126,6 +135,36 @@ export class App {
   scene = new Scene();
 
   update = () => {
+    this.creature.world.step(1/60);
+    // let spam = (message: any) => console.log(message);
+    let spam = (message: any) => {};
+    spam('Update!');
+    let quaternion = new Quaternion();
+    this.creature.world.bodies.forEach(body => {
+      if (body instanceof EditorBody) {
+        let {visual} = body;
+        spam('body position and quaternion');
+        spam(body.position);
+        spam(body.quaternion);
+        let transform = new Matrix4();
+        let {quaternion: bodyQuat} = body;
+        quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
+        transform.makeRotationFromQuaternion(quaternion);
+        transform.setPosition(body.position as any);
+        spam(`3js'd transform, parent matrix, parent inverse`);
+        spam(transform);
+        spam(visual.parent.matrixWorld.clone());
+        let result = new Matrix4().getInverse(visual.parent.matrixWorld);
+        spam(result.clone());
+        result.multiply(transform);
+        spam('new local');
+        spam(result);
+        visual.position.setFromMatrixPosition(result);
+        visual.rotation.setFromRotationMatrix(result);
+        visual.updateMatrixWorld(false);
+        spam('-----------');
+      }
+    });
     this.control.update();
     this.render();
   };
