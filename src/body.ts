@@ -1,5 +1,6 @@
 import {
-  Body, Box, HingeConstraint, IBodyOptions, Plane, World, Vec3,
+  Body, Box, HingeConstraint, IBodyOptions, Plane, PointToPointConstraint,
+  World, Vec3,
 } from 'cannon';
 import {
   Color, Geometry, Mesh, MeshPhysicalMaterial, Object3D, SphereGeometry,
@@ -31,10 +32,11 @@ export class EditorBone extends Object3D {
     mesh.translateY(-radius);
     this.add(mesh);
     // Physics for editing purposes.
+    let damping = 1 - 1e-5;
     let body = new EditorBody(this, {
-      angularDamping: 0.5, linearDamping: 0.5, mass: 1,
+      angularDamping: damping, linearDamping: damping, mass: 1,
     });
-    body.collisionFilterGroup = 1;
+    body.collisionFilterGroup = 0;
     body.collisionFilterMask = 0;
     body.addShape(
       new Box(new Vec3(0.3 * radius, radius, 0.3 * radius)),
@@ -81,21 +83,55 @@ export class Creature extends Object3D {
       let worldPos = bone.getWorldPosition(new Vector3());
       bone.body.position.set(worldPos.x, worldPos.y, worldPos.z);
       world.addBody(bone.body);
-      console.log(bone.body.position);
+      // console.log(bone.body.position);
       prevBone = bone;
     });
     if (false) {
-      let angles = [0.5, 0.5, 0.5, 0.5, -0.5, -0.25];
-      angles.forEach((angle, i) => {
-        bones[i].rotateZ(angle);
-      });
+      let ground = new Body();
+      ground.addShape(new Plane());
+      ground.quaternion.setFromAxisAngle(new Vec3(0, 1, 0), Math.PI / 2);
+      world.addBody(ground);
     }
-    let ground = new Body();
-    ground.addShape(new Plane());
-    ground.quaternion.setFromAxisAngle(new Vec3(0, 1, 0), Math.PI / 2);
-    world.addBody(ground);
+    world.addBody(this.grabber);
   }
 
+  grabber = new Grabber();
+
   world = new World();
+
+}
+
+export class Grabber extends Body {
+
+  constructor() {
+    super();
+    this.collisionFilterGroup = 0;
+    this.collisionFilterMask = 0;
+  }
+
+  grab(body: Body, point: Vector3) {
+    if (this.joint) {
+      this.release();
+    }
+    // Body point in local coordinates
+    let bodyPoint = new Vec3().copy(point as any).vsub(body.position);
+    bodyPoint = body.quaternion.inverse().vmult(bodyPoint);
+    // Grabber is easy.
+    this.position.copy(point as any);
+    // Joint.
+    let joint = new PointToPointConstraint(this, Vec3.ZERO, body, bodyPoint);
+    body.world.addConstraint(joint);
+    this.joint = joint;
+  }
+
+  joint?: PointToPointConstraint = undefined;
+
+  release() {
+    let {joint} = this;
+    if (joint) {
+      joint.bodyA.world.removeConstraint(joint);
+      this.joint = undefined;
+    }
+  }
 
 }

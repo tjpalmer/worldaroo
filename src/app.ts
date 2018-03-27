@@ -1,7 +1,7 @@
 import {Creature, EditorBody, EditorBone, OrbitControls} from './';
 import {Vec3} from 'cannon';
 import {
-  AmbientLight, BoxGeometry, Color, DirectionalLight, Matrix4, Mesh,
+  AmbientLight, BoxGeometry, Color, DirectionalLight, DoubleSide, Matrix4, Mesh,
   MeshPhysicalMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Raycaster,
   Scene, Vector2, Vector3, WebGLRenderer, Quaternion,
 } from 'three';
@@ -39,7 +39,7 @@ export class App {
     // Custom listeners before camera control.
     addEventListener('resize', this.resize);
     addEventListener('mousedown', this.press);
-    addEventListener('mouseup', () => {this.controlCamera = false});
+    addEventListener('mouseup', this.release);
     document.addEventListener('mousemove', this.hover);
     document.addEventListener('wheel', this.update);
     // Camera control.
@@ -63,61 +63,99 @@ export class App {
 
   hover = (event: MouseEvent) => {
     if (!this.controlCamera) {
+      let {grabber} = this.creature;
+      if (grabber.joint) {
+        let intersection =
+          this.intersect(this.screenPoint(event), this.symmetry);
+        if (intersection) {
+          // The plane might be off from zero, but we need to pretend it was at
+          // zero z.
+          let {point} = intersection;
+          point.z = 0;
+          grabber.position.copy(point as any);
+          grabber.joint.update();
+        }
+      }
       event.stopImmediatePropagation();
     }
     this.update();
   };
 
-  intersect(event: MouseEvent) {
-    let canvas = this.renderer.domElement;
-    // Convert mouse to display space.
-    // TODO No temporary objects (except intersections, I guess).
-    let mouse = new Vector2(event.clientX, event.clientY);
-    mouse.divide(this.size);
-    mouse.multiplyScalar(2).addScalar(-1).multiply(new Vector2(1, -1));
+  intersect(screenPoint: Vector2, object: Object3D) {
+    let {raycaster} = this;
     // Find anything behind the mouse.
-    let raycaster = new Raycaster();
-    raycaster.setFromCamera(mouse, this.camera);
-    let intersections = raycaster.intersectObject(this.scene, true);
+    raycaster.setFromCamera(screenPoint, this.camera);
+    let intersections = raycaster.intersectObject(object, true);
     if (intersections.length) {
-      return intersections[0].object;
+      return intersections[0];
     }
   }
 
   press = (event: MouseEvent) => {
-    let object = this.intersect(event);
+    let screenPoint = this.screenPoint(event);
+    let intersection = this.intersect(screenPoint, this.scene);
+    let object = intersection && intersection.object;
     this.controlCamera = true;
     type Physical = {material: MeshPhysicalMaterial};
-    check: if (object && object.parent instanceof EditorBone) {
+    if (object && object.parent instanceof EditorBone) {
       this.controlCamera = false;
       let bone = object.parent;
-      let kick = (scale: number) => {
-        bone.body.applyImpulse(
-          new Vec3(0.1 * scale, 0, 0),
-          new Vec3().copy(bone.getWorldPosition(new Vector3()) as any),
-        );
-      }
+      // Get the intersection point as the user expected from the click.
+      // We can't just intersect the center plane, because they might be looking
+      // from a front or back where the center plane would be far off.
+      let {point} = intersection!;
+      // But push it to the center plane, so we act symmetrically on the object.
+      // TODO This applies only to spinal bones.
+      // First pretend our symmetry plane is offset to where we clicked so only
+      // relative plane motions matter.
+      this.symmetry.position.z = point.z;
+      point.z = 0;
+      // console.log(point);
+      let hadFocus = false;
       if (this.focus) {
         if (this.focus == object) {
-          kick(-1.1);
-          break check;
+          hadFocus = true;
+        } else {
+          (this.focus as any as Physical).material.color.set(bone.color);
         }
-        (this.focus as any as Physical).material.color.set(bone.color);
       }
-      kick(1);
-      let {material} = (object as any as Physical);
-      let {color} = bone;
-      material.color.setHSL(1/6, 1, 0.7);
-      this.focus = object;
+      if (!hadFocus) {
+        let {material} = object as any as Physical;
+        let {color} = bone;
+        material.color.setHSL(1/6, 1, 0.7);
+        this.focus = object;
+      }
+      // Grab it.
+      this.creature.grabber.grab(bone.body, point);
     }
     this.update();
+  };
+
+  raycaster = new Raycaster();
+
+  release = () => {
+    this.controlCamera = false;
+    this.creature.grabber.release();
   };
 
   render() {
     this.renderer.render(this.scene, this.camera);
   }
 
+  screenPoint(event: MouseEvent) {
+    // Convert mouse to display space.
+    // TODO No temporary objects (except intersections, I guess).
+    let point = new Vector2(event.clientX, event.clientY);
+    point.divide(this.size);
+    point.multiplyScalar(2).addScalar(-1).multiply(new Vector2(1, -1));
+    return point;
+  }
+
   size = new Vector2();
+
+  symmetry = new Mesh(
+    new PlaneGeometry(1e3, 1e3), new MeshPhysicalMaterial({side: DoubleSide}),
+  );
 
   renderer: WebGLRenderer;
 
