@@ -29,13 +29,16 @@ export class App {
     let floor = new Mesh(floorGeometry, floorMaterial).rotateX(-Math.PI / 2);
     scene.add(floor);
     // Light.
-    let light = new DirectionalLight(0xffffff, 2);
-    light.position.set(-1, 1, 1);
+    let light = new DirectionalLight(0xffffff, 1.5);
+    light.position.set(1, 0.8, 0.5);
     scene.add(light);
+    let light2 = new DirectionalLight(0xffffff, 0.5);
+    light2.position.set(0, 1, 0);
+    scene.add(light2);
     scene.add(new AmbientLight(0xffffff, 0.5));
     // Camera.
-    camera.position.set(0, 1, 2);
-    camera.lookAt(0, 1, 0);
+    let xz = new Vector2(1, 1).normalize().multiplyScalar(2);
+    camera.position.set(xz.x, 1.9, xz.y);
     // Custom listeners before camera control.
     addEventListener('resize', this.resize);
     addEventListener('mousedown', this.press);
