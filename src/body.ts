@@ -32,7 +32,7 @@ export class EditorBone extends Object3D {
     mesh.translateY(-radius);
     this.add(mesh);
     // Physics for editing purposes.
-    let damping = 1 - 1e-5;
+    let damping = 1 - 1e-4;
     let body = new EditorBody(this, {
       angularDamping: damping, linearDamping: damping, mass: 1,
     });

@@ -65,7 +65,9 @@ export class App {
   focus?: Object3D = undefined;
 
   hover = (event: MouseEvent) => {
-    if (!this.controlCamera) {
+    if (this.controlCamera) {
+      this.update();
+    } else {
       let {grabber} = this.creature;
       if (grabber.joint) {
         let intersection =
@@ -78,10 +80,10 @@ export class App {
           grabber.position.copy(point as any);
           grabber.joint.update();
         }
+        this.update();
       }
       event.stopImmediatePropagation();
     }
-    this.update();
   };
 
   intersect(screenPoint: Vector2, object: Object3D) {
@@ -177,35 +179,42 @@ export class App {
 
   update = () => {
     this.creature.world.step(1/60);
-    // let spam = (message: any) => console.log(message);
     let spam = (message: any) => {};
-    spam('Update!');
+    // spam = (message: any) => console.log(message);
+    // spam('Update!');
     let quaternion = new Quaternion();
+    let maxVel = 0;
     this.creature.world.bodies.forEach(body => {
       if (body instanceof EditorBody) {
+        maxVel =
+          Math.max(maxVel, body.velocity.norm(), body.angularVelocity.norm());
         let {visual} = body;
-        spam('body position and quaternion');
-        spam(body.position);
-        spam(body.quaternion);
+        // spam('body position and quaternion');
+        // spam(body.position);
+        // spam(body.quaternion);
         let transform = new Matrix4();
         let {quaternion: bodyQuat} = body;
         quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
         transform.makeRotationFromQuaternion(quaternion);
         transform.setPosition(body.position as any);
-        spam(`3js'd transform, parent matrix, parent inverse`);
-        spam(transform);
-        spam(visual.parent.matrixWorld.clone());
+        // spam(`3js'd transform, parent matrix, parent inverse`);
+        // spam(transform);
+        // spam(visual.parent.matrixWorld.clone());
         let result = new Matrix4().getInverse(visual.parent.matrixWorld);
-        spam(result.clone());
+        // spam(result.clone());
         result.multiply(transform);
-        spam('new local');
-        spam(result);
+        // spam('new local');
+        // spam(result);
         visual.position.setFromMatrixPosition(result);
         visual.rotation.setFromRotationMatrix(result);
         visual.updateMatrixWorld(false);
-        spam('-----------');
+        // spam('-----------');
       }
     });
+    // console.log(maxVel);
+    if (maxVel > 1e-2) {
+      setTimeout(this.update, 300);
+    }
     this.control.update();
     this.render();
   };
