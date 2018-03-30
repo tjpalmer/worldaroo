@@ -128,7 +128,7 @@ export class Creature extends Object3D {
       // TODO Retain global limb rotation when moving spine, but local position.
       // Attach arms to bones[2], the upper torso.
       [-0.2, 0.2].forEach(z => {
-        let arm = new Chain([0, -0.3, -0.55, -0.75]);
+        let arm = new Chain([0, -0.35, -0.65, -0.85]);
         if (false) {
           // T pose.
           arm.rotateX((z > 0 ? -1 : 1) * Math.PI / 2);
