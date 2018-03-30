@@ -25,7 +25,9 @@ export class EditorBone extends Object3D {
     // TODO Also add editor tools on hover.
     this.length = length;
     let radius = length / 2;
-    let geometry = new SphereGeometry(radius, 4, 2).scale(0.3, 1, 0.3);
+    let geometry =
+      // TODO Width as nonlinear function of length.
+      new SphereGeometry(radius, 4, 2).scale(0.03 / radius, 1, 0.03 / radius);
     let color = this.color = new Color().setHSL(2/3, 0.1, 1/2);
     let material = new MeshPhysicalMaterial({color, roughness: 0.75});
     let mesh = new Mesh(geometry, material);
@@ -50,6 +52,34 @@ export class EditorBone extends Object3D {
   color: Color;
 
   length: number;
+
+}
+
+// TODO Make spine a chain? Subclass chain for spine, limbs, fingers, etc?
+// TODO Parameters, constraints, forks?
+export class Chain extends Object3D {
+
+  constructor(positions: number[]) {
+    super();
+    let bones = [] as EditorBone[];
+    let prevBone: EditorBone | undefined;
+    positions.slice(1).forEach((y, i) => {
+      let length = positions[i] - y;
+      let bone = new EditorBone(length);
+      if (prevBone) {
+        bone.position.y = -prevBone.length;
+        prevBone.add(bone);
+      } else {
+        bone.position.y = positions[0];
+        this.add(bone);
+      }
+      bones.push(bone);
+      // let worldPos = bone.getWorldPosition(new Vector3());
+      // bone.body.position.set(worldPos.x, worldPos.y, worldPos.z);
+      // console.log(bone.body.position);
+      prevBone = bone;
+    });
+  }
 
 }
 
@@ -86,11 +116,34 @@ export class Creature extends Object3D {
       // console.log(bone.body.position);
       prevBone = bone;
     });
+    // TODO Define any ground body elsewhere.
     if (false) {
       let ground = new Body();
       ground.addShape(new Plane());
+      // TODO Get the rotation right.
       ground.quaternion.setFromAxisAngle(new Vec3(0, 1, 0), Math.PI / 2);
       world.addBody(ground);
+    }
+    if (true) {
+      // TODO Retain global limb rotation when moving spine, but local position.
+      // Attach arms to bones[2], the upper torso.
+      [-0.2, 0.2].forEach(z => {
+        let arm = new Chain([0, -0.3, -0.55, -0.75]);
+        if (false) {
+          // T pose.
+          arm.rotateX((z > 0 ? -1 : 1) * Math.PI / 2);
+        }
+        arm.position.z = z;
+        bones[2].add(arm);
+      });
+      // And legs attached to the pelvis.
+      let pelvis = bones.slice(-1)[0];
+      [-0.15, 0.15].forEach(z => {
+        let arm = new Chain([0, -0.45, -0.9, -1]);
+        arm.position.y = -pelvis.length;
+        arm.position.z = z;
+        pelvis.add(arm);
+      });
     }
     world.addBody(this.grabber);
   }

@@ -178,7 +178,7 @@ export class App {
   scene = new Scene();
 
   update = () => {
-    this.creature.world.step(1/60);
+    this.creature.world.step(1/10, 1);
     let spam = (message: any) => {};
     // spam = (message: any) => console.log(message);
     // spam('Update!');
