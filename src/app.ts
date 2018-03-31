@@ -187,15 +187,6 @@ export class App {
     );
     // Step physics.
     this.creature.world.step(1/10, 1);
-    // Restore global limb orientations.
-    this.creature.limbs.forEach((limb, index) => {
-      let orientation = limbOrientations[index];
-      transform.makeRotationFromQuaternion(quaternion);
-      let result = transform2.getInverse(limb.parent.matrixWorld);
-      result.multiply(transform);
-      limb.rotation.setFromRotationMatrix(result);
-      limb.updateMatrixWorld(false);
-    });
     // Update scene graph from physics world.
     let spam = (message: any) => {};
     // spam = (message: any) => console.log(message);
@@ -226,6 +217,15 @@ export class App {
         visual.updateMatrixWorld(false);
         // spam('-----------');
       }
+    });
+    // Restore global limb orientations.
+    this.creature.limbs.forEach((limb, index) => {
+      let orientation = limbOrientations[index];
+      transform.makeRotationFromQuaternion(quaternion);
+      let result = transform2.getInverse(limb.parent.matrixWorld);
+      result.multiply(transform);
+      limb.rotation.setFromRotationMatrix(result);
+      limb.updateMatrixWorld(false);
     });
     // console.log(maxVel);
     if (maxVel > 1e-2) {
