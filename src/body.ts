@@ -138,20 +138,24 @@ export class Creature extends Object3D {
         }
         arm.position.z = z;
         bones[2].add(arm);
+        this.limbs.push(arm);
       });
       // And legs attached to the pelvis.
       let pelvis = bones.slice(-1)[0];
       [-0.15, 0.15].forEach(z => {
-        let arm = new Chain([0, -0.45, -0.9, -1]);
-        arm.position.y = -pelvis.length;
-        arm.position.z = z;
-        pelvis.add(arm);
+        let leg = new Chain([0, -0.45, -0.9, -1]);
+        leg.position.y = -pelvis.length;
+        leg.position.z = z;
+        pelvis.add(leg);
+        this.limbs.push(leg);
       });
     }
     world.addBody(this.grabber);
   }
 
   grabber = new Grabber();
+
+  limbs = new Array<Chain>();
 
   world = new World();
 

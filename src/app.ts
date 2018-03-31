@@ -2,8 +2,8 @@ import {Creature, EditorBody, EditorBone, OrbitControls} from './';
 import {Vec3} from 'cannon';
 import {
   AmbientLight, BoxGeometry, Color, DirectionalLight, DoubleSide, Matrix4, Mesh,
-  MeshPhysicalMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Raycaster,
-  Scene, Vector2, Vector3, WebGLRenderer, Quaternion,
+  MeshPhysicalMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Quaternion,
+  Raycaster, Scene, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 
 export class App {
@@ -178,11 +178,28 @@ export class App {
   scene = new Scene();
 
   update = () => {
+    let quaternion = new Quaternion();
+    let transform = new Matrix4();
+    let transform2 = new Matrix4();
+    // Remember global limb orientations.
+    let limbOrientations = this.creature.limbs.map(
+      limb => limb.getWorldQuaternion(quaternion) as Quaternion,
+    );
+    // Step physics.
     this.creature.world.step(1/10, 1);
+    // Restore global limb orientations.
+    this.creature.limbs.forEach((limb, index) => {
+      let orientation = limbOrientations[index];
+      transform.makeRotationFromQuaternion(quaternion);
+      let result = transform2.getInverse(limb.parent.matrixWorld);
+      result.multiply(transform);
+      limb.rotation.setFromRotationMatrix(result);
+      limb.updateMatrixWorld(false);
+    });
+    // Update scene graph from physics world.
     let spam = (message: any) => {};
     // spam = (message: any) => console.log(message);
     // spam('Update!');
-    let quaternion = new Quaternion();
     let maxVel = 0;
     this.creature.world.bodies.forEach(body => {
       if (body instanceof EditorBody) {
@@ -192,7 +209,6 @@ export class App {
         // spam('body position and quaternion');
         // spam(body.position);
         // spam(body.quaternion);
-        let transform = new Matrix4();
         let {quaternion: bodyQuat} = body;
         quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
         transform.makeRotationFromQuaternion(quaternion);
@@ -200,7 +216,7 @@ export class App {
         // spam(`3js'd transform, parent matrix, parent inverse`);
         // spam(transform);
         // spam(visual.parent.matrixWorld.clone());
-        let result = new Matrix4().getInverse(visual.parent.matrixWorld);
+        let result = transform2.getInverse(visual.parent.matrixWorld);
         // spam(result.clone());
         result.multiply(transform);
         // spam('new local');
