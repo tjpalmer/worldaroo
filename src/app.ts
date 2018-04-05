@@ -1,4 +1,4 @@
-import {Creature, EditorBody, EditorBone, OrbitControls} from './';
+import {Creature, EditorBody, EditorBone, OrbitControls, EditorGroup} from './';
 import {Vec3} from 'cannon';
 import {
   AmbientLight, BoxGeometry, Color, DirectionalLight, DoubleSide, Matrix4, Mesh,
@@ -64,19 +64,34 @@ export class App {
 
   focus?: Object3D = undefined;
 
+  focusGroup() {
+    let {focus} = this;
+    let group: EditorGroup | undefined;
+    if (focus && focus.parent instanceof EditorBone) {
+      let bone = focus.parent;
+      group = bone.group;
+    }
+    return group;
+  }
+
   hover = (event: MouseEvent) => {
+    // let hi = this.intersect(this.screenPoint(event), this.workPlane);
+    // if (hi) console.log(hi.point);
     if (this.controlCamera) {
       this.update();
     } else {
       let {grabber} = this.creature;
       if (grabber.joint) {
         let intersection =
-          this.intersect(this.screenPoint(event), this.symmetry);
+          this.intersect(this.screenPoint(event), this.workPlane);
         if (intersection) {
-          // The plane might be off from zero, but we need to pretend it was at
-          // zero z.
           let {point} = intersection;
-          point.z = 0;
+          let group = this.focusGroup();
+          if (group == this.creature) {
+            // The plane might be off from zero, but we need to pretend it was
+            // at zero z for the spine.
+            point.z = 0;
+          }
           grabber.position.copy(point as any);
           grabber.joint.update();
         }
@@ -103,18 +118,11 @@ export class App {
     this.controlCamera = true;
     type Physical = {material: MeshPhysicalMaterial};
     if (object && object.parent instanceof EditorBone) {
+      let {group} = object.parent;
       this.controlCamera = false;
       let bone = object.parent;
-      // Get the intersection point as the user expected from the click.
-      // We can't just intersect the center plane, because they might be looking
-      // from a front or back where the center plane would be far off.
       let {point} = intersection!;
-      // But push it to the center plane, so we act symmetrically on the object.
-      // TODO This applies only to spinal bones.
-      // First pretend our symmetry plane is offset to where we clicked so only
-      // relative plane motions matter.
-      this.symmetry.position.z = point.z;
-      point.z = 0;
+      group.prepareWorkPlane(this.workPlane, point, this.raycaster.ray);
       // console.log(point);
       let hadFocus = false;
       if (this.focus) {
@@ -158,10 +166,6 @@ export class App {
 
   size = new Vector2();
 
-  symmetry = new Mesh(
-    new PlaneGeometry(1e3, 1e3), new MeshPhysicalMaterial({side: DoubleSide}),
-  );
-
   renderer: WebGLRenderer;
 
   resize = () => {
@@ -183,20 +187,27 @@ export class App {
     let transform2 = new Matrix4();
     // Remember global limb orientations.
     let limbOrientations = this.creature.limbs.map(
-      limb => limb.getWorldQuaternion(quaternion) as Quaternion,
+      limb => limb.getWorldQuaternion(quaternion),
     );
     // Step physics.
-    this.creature.world.step(1/10, 1);
+    let {world} = this.creature;
+    let {focus} = this;
+    let group = this.focusGroup();
+    if (group) {
+      world = group.world;
+    }
+    world.step(1/10, 1);
     // Update scene graph from physics world.
     let spam = (message: any) => {};
     // spam = (message: any) => console.log(message);
     // spam('Update!');
     let maxVel = 0;
-    this.creature.world.bodies.forEach(body => {
+    world.bodies.forEach(body => {
       if (body instanceof EditorBody) {
         maxVel =
           Math.max(maxVel, body.velocity.norm(), body.angularVelocity.norm());
         let {visual} = body;
+        // spam(visual.uuid);
         // spam('body position and quaternion');
         // spam(body.position);
         // spam(body.quaternion);
@@ -218,15 +229,17 @@ export class App {
         // spam('-----------');
       }
     });
-    // Restore global limb orientations.
-    this.creature.limbs.forEach((limb, index) => {
-      let orientation = limbOrientations[index];
-      transform.makeRotationFromQuaternion(quaternion);
-      let result = transform2.getInverse(limb.parent.matrixWorld);
-      result.multiply(transform);
-      limb.rotation.setFromRotationMatrix(result);
-      limb.updateMatrixWorld(false);
-    });
+    if (group == this.creature) {
+      // Restore global limb orientations.
+      this.creature.limbs.forEach((limb, index) => {
+        let orientation = limbOrientations[index];
+        transform.makeRotationFromQuaternion(quaternion);
+        let result = transform2.getInverse(limb.parent.matrixWorld);
+        result.multiply(transform);
+        limb.rotation.setFromRotationMatrix(result);
+        limb.updateMatrixWorld(false);
+      });
+    }
     // console.log(maxVel);
     if (maxVel > 1e-2) {
       setTimeout(this.update, 300);
@@ -234,5 +247,9 @@ export class App {
     this.control.update();
     this.render();
   };
+
+  workPlane = new Mesh(
+    new PlaneGeometry(1e3, 1e3), new MeshPhysicalMaterial({side: DoubleSide}),
+  );
 
 }

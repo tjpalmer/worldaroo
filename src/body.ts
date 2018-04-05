@@ -3,8 +3,8 @@ import {
   World, Vec3,
 } from 'cannon';
 import {
-  Color, Geometry, Mesh, MeshPhysicalMaterial, Object3D, SphereGeometry,
-  Vector3,
+  Color, Geometry, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray,
+  SphereGeometry, Vector3,
 } from 'three';
 
 export class EditorBody extends Body {
@@ -20,8 +20,9 @@ export class EditorBody extends Body {
 
 export class EditorBone extends Object3D {
 
-  constructor(length: number) {
+  constructor(group: EditorGroup, length: number) {
     super();
+    this.group = group;
     // TODO Also add editor tools on hover.
     this.length = length;
     let radius = length / 2;
@@ -51,39 +52,95 @@ export class EditorBone extends Object3D {
 
   color: Color;
 
+  group: EditorGroup;
+
   length: number;
+
+}
+
+export class EditorGroup extends Object3D {
+
+  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {}
+
+  world = new World();
 
 }
 
 // TODO Make spine a chain? Subclass chain for spine, limbs, fingers, etc?
 // TODO Parameters, constraints, forks?
-export class Chain extends Object3D {
+export class Chain extends EditorGroup {
 
   constructor(positions: number[]) {
     super();
+    let {world} = this;
     let bones = [] as EditorBone[];
     let prevBone: EditorBone | undefined;
     positions.slice(1).forEach((y, i) => {
       let length = positions[i] - y;
-      let bone = new EditorBone(length);
+      let bone = new EditorBone(this, length);
       if (prevBone) {
         bone.position.y = -prevBone.length;
         prevBone.add(bone);
+        world.addConstraint(new PointToPointConstraint(
+          prevBone.body, new Vec3(0, -prevBone.length), bone.body, Vec3.ZERO,
+        ));
       } else {
         bone.position.y = positions[0];
         this.add(bone);
       }
       bones.push(bone);
-      // let worldPos = bone.getWorldPosition(new Vector3());
-      // bone.body.position.set(worldPos.x, worldPos.y, worldPos.z);
+      let worldPos = bone.getWorldPosition(new Vector3());
+      bone.body.position.set(worldPos.x, worldPos.y, worldPos.z);
+      world.addBody(bone.body);
       // console.log(bone.body.position);
       prevBone = bone;
     });
+    this.bones = bones;
+  }
+
+  anchor?: Grabber = undefined;
+
+  bones: EditorBone[];
+
+  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
+    console.log(ray.direction);
+    workPlane.position.copy(point);
+    // console.log(workPlane.getWorldQuaternion(new Quaternion()));
+    if (true) {
+      workPlane.setRotationFromQuaternion(
+        new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), ray.direction)
+      );
+    } else {
+      workPlane.lookAt(ray.direction);
+    }
+    console.log(workPlane.getWorldQuaternion(new Quaternion()));
+    workPlane.updateMatrixWorld(false);
+    // console.log(workPlane.matrixWorld);
+    // Make physics match scene graph.
+    let quat = new Quaternion();
+    let vec = new Vector3();
+    this.world.bodies.forEach(body => {
+      if (body instanceof EditorBody) {
+        let {visual} = body;
+        body.position.copy(visual.getWorldPosition(vec) as any);
+        visual.getWorldQuaternion(quat);
+        body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+      }
+    });
+    // Reset anchor.
+    if (this.anchor) {
+      this.anchor.release();
+      this.world.remove(this.anchor);
+    }
+    this.anchor = new Grabber();
+    this.world.addBody(this.anchor);
+    let first = this.bones[0];
+    this.anchor.grab(first.body, first.getWorldPosition(vec));
   }
 
 }
 
-export class Creature extends Object3D {
+export class Creature extends EditorGroup {
 
   constructor() {
     super();
@@ -98,7 +155,7 @@ export class Creature extends Object3D {
     let positions = [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1];
     positions.slice(1).forEach((y, i) => {
       let length = positions[i] - y;
-      let bone = new EditorBone(length);
+      let bone = new EditorBone(this, length);
       if (prevBone) {
         bone.position.y = -prevBone.length;
         prevBone.add(bone);
@@ -106,7 +163,7 @@ export class Creature extends Object3D {
           axisA: new Vec3(0, 0, 1),
           axisB: new Vec3(0, 0, 1),
           pivotA: new Vec3(0, -prevBone.length, 0),
-          pivotB: new Vec3(),
+          pivotB: Vec3.ZERO,
         }));
       } else {
         bone.position.y = positions[0];
@@ -153,20 +210,32 @@ export class Creature extends Object3D {
     world.addBody(this.grabber);
   }
 
-  grabber = new Grabber();
+  grabber = new Grabber(1);
 
   limbs = new Array<Chain>();
 
-  world = new World();
+  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
+    // Get the intersection point as the user expected from the click.
+    // We can't just intersect the center plane, because they might be looking
+    // from a front or back where the center plane would be far off.
+    // But push it to the center plane, so we act symmetrically on the object.
+    // First pretend our symmetry plane is offset to where we clicked so only
+    // relative plane motions matter.
+    workPlane.position.set(0, 0, point.z);
+    workPlane.lookAt(0, 0, 1);
+    workPlane.updateMatrixWorld(false);
+    point.z = 0;
+  }
 
 }
 
 export class Grabber extends Body {
 
-  constructor() {
+  constructor(maxForce?: number) {
     super();
     this.collisionFilterGroup = 0;
     this.collisionFilterMask = 0;
+    this.maxForce = maxForce;
   }
 
   grab(body: Body, point: Vector3) {
@@ -179,12 +248,16 @@ export class Grabber extends Body {
     // Grabber is easy.
     this.position.copy(point as any);
     // Joint.
-    let joint = new PointToPointConstraint(this, Vec3.ZERO, body, bodyPoint);
+    let joint = new PointToPointConstraint(
+      this, Vec3.ZERO, body, bodyPoint, this.maxForce,
+    );
     body.world.addConstraint(joint);
     this.joint = joint;
   }
 
   joint?: PointToPointConstraint = undefined;
+
+  maxForce?: number;
 
   release() {
     let {joint} = this;
