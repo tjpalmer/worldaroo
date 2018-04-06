@@ -60,6 +60,8 @@ export class EditorBone extends Object3D {
 
 export class EditorGroup extends Object3D {
 
+  grabber = new Grabber(1);
+
   prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {}
 
   world = new World();
@@ -82,7 +84,8 @@ export class Chain extends EditorGroup {
         bone.position.y = -prevBone.length;
         prevBone.add(bone);
         world.addConstraint(new PointToPointConstraint(
-          prevBone.body, new Vec3(0, -prevBone.length), bone.body, Vec3.ZERO,
+          prevBone.body, new Vec3(0, -prevBone.length, 0),
+          bone.body, Vec3.ZERO,
         ));
       } else {
         bone.position.y = positions[0];
@@ -96,6 +99,7 @@ export class Chain extends EditorGroup {
       prevBone = bone;
     });
     this.bones = bones;
+    world.addBody(this.grabber);
   }
 
   anchor?: Grabber = undefined;
@@ -103,17 +107,13 @@ export class Chain extends EditorGroup {
   bones: EditorBone[];
 
   prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
-    console.log(ray.direction);
+    // console.log(ray.direction);
     workPlane.position.copy(point);
     // console.log(workPlane.getWorldQuaternion(new Quaternion()));
-    if (true) {
-      workPlane.setRotationFromQuaternion(
-        new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), ray.direction)
-      );
-    } else {
-      workPlane.lookAt(ray.direction);
-    }
-    console.log(workPlane.getWorldQuaternion(new Quaternion()));
+    workPlane.setRotationFromQuaternion(
+      new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), ray.direction)
+    );
+    // console.log(workPlane.getWorldQuaternion(new Quaternion()));
     workPlane.updateMatrixWorld(false);
     // console.log(workPlane.matrixWorld);
     // Make physics match scene graph.
@@ -159,12 +159,17 @@ export class Creature extends EditorGroup {
       if (prevBone) {
         bone.position.y = -prevBone.length;
         prevBone.add(bone);
-        world.addConstraint(new HingeConstraint(prevBone.body, bone.body, {
-          axisA: new Vec3(0, 0, 1),
-          axisB: new Vec3(0, 0, 1),
-          pivotA: new Vec3(0, -prevBone.length, 0),
-          pivotB: Vec3.ZERO,
-        }));
+        // Given controlled grabber placement, points work as well as hinges.
+        // TODO Cone twist constraints!
+        // world.addConstraint(new HingeConstraint(prevBone.body, bone.body, {
+        //   axisA: new Vec3(0, 0, 1),
+        //   axisB: new Vec3(0, 0, 1),
+        //   pivotA: new Vec3(0, -prevBone.length, 0),
+        //   pivotB: Vec3.ZERO,
+        // }));
+        world.addConstraint(new PointToPointConstraint(
+          prevBone.body, new Vec3(0, -prevBone.length, 0), bone.body, Vec3.ZERO,
+        ));
       } else {
         bone.position.y = positions[0];
         this.add(bone);
@@ -188,7 +193,7 @@ export class Creature extends EditorGroup {
       // TODO Retain global limb rotation when moving spine, but local position.
       // Attach arms to bones[2], the upper torso.
       [-0.2, 0.2].forEach(z => {
-        let arm = new Chain([0, -0.35, -0.65, -0.85]);
+        let arm = new Chain([0, -0.35, -0.65, -0.85, -0.85]);
         if (false) {
           // T pose.
           arm.rotateX((z > 0 ? -1 : 1) * Math.PI / 2);
@@ -200,7 +205,7 @@ export class Creature extends EditorGroup {
       // And legs attached to the pelvis.
       let pelvis = bones.slice(-1)[0];
       [-0.15, 0.15].forEach(z => {
-        let leg = new Chain([0, -0.45, -0.9, -1]);
+        let leg = new Chain([0, -0.45, -0.9, -1, -1]);
         leg.position.y = -pelvis.length;
         leg.position.z = z;
         pelvis.add(leg);
@@ -209,8 +214,6 @@ export class Creature extends EditorGroup {
     }
     world.addBody(this.grabber);
   }
-
-  grabber = new Grabber(1);
 
   limbs = new Array<Chain>();
 

@@ -80,22 +80,25 @@ export class App {
     if (this.controlCamera) {
       this.update();
     } else {
-      let {grabber} = this.creature;
-      if (grabber.joint) {
-        let intersection =
-          this.intersect(this.screenPoint(event), this.workPlane);
-        if (intersection) {
-          let {point} = intersection;
-          let group = this.focusGroup();
-          if (group == this.creature) {
-            // The plane might be off from zero, but we need to pretend it was
-            // at zero z for the spine.
-            point.z = 0;
+      let group = this.focusGroup();
+      if (group) {
+        let {grabber} = group;
+        if (grabber.joint) {
+          let intersection =
+            this.intersect(this.screenPoint(event), this.workPlane);
+          if (intersection) {
+            let {point} = intersection;
+            let group = this.focusGroup();
+            if (group == this.creature) {
+              // The plane might be off from zero, but we need to pretend it was
+              // at zero z for the spine.
+              point.z = 0;
+            }
+            grabber.position.copy(point as any);
+            grabber.joint.update();
           }
-          grabber.position.copy(point as any);
-          grabber.joint.update();
+          this.update();
         }
-        this.update();
       }
       event.stopImmediatePropagation();
     }
@@ -139,7 +142,7 @@ export class App {
         this.focus = object;
       }
       // Grab it.
-      this.creature.grabber.grab(bone.body, point);
+      group.grabber.grab(bone.body, point);
     }
     this.update();
   };
@@ -148,7 +151,10 @@ export class App {
 
   release = () => {
     this.controlCamera = false;
-    this.creature.grabber.release();
+    let group = this.focusGroup();
+    if (group) {
+      group.grabber.release();
+    }
   };
 
   render() {
