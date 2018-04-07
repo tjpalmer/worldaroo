@@ -89,11 +89,11 @@ export class App {
           if (intersection) {
             let {point} = intersection;
             let group = this.focusGroup();
-            if (group == this.creature) {
-              // The plane might be off from zero, but we need to pretend it was
-              // at zero z for the spine.
-              point.z = 0;
-            }
+            // if (group == this.creature) {
+            //   // The plane might be off from zero, but we need to pretend it was
+            //   // at zero z for the spine.
+            //   point.z = 0;
+            // }
             grabber.position.copy(point as any);
             grabber.joint.update();
           }
@@ -235,17 +235,17 @@ export class App {
         // spam('-----------');
       }
     });
-    if (group == this.creature) {
-      // Restore global limb orientations.
-      this.creature.limbs.forEach((limb, index) => {
-        let orientation = limbOrientations[index];
-        transform.makeRotationFromQuaternion(quaternion);
-        let result = transform2.getInverse(limb.parent.matrixWorld);
-        result.multiply(transform);
-        limb.rotation.setFromRotationMatrix(result);
-        limb.updateMatrixWorld(false);
-      });
-    }
+    // if (group == this.creature) {
+    //   // Restore global limb orientations.
+    //   this.creature.limbs.forEach((limb, index) => {
+    //     let orientation = limbOrientations[index];
+    //     transform.makeRotationFromQuaternion(quaternion);
+    //     let result = transform2.getInverse(limb.parent.matrixWorld);
+    //     result.multiply(transform);
+    //     limb.rotation.setFromRotationMatrix(result);
+    //     limb.updateMatrixWorld(false);
+    //   });
+    // }
     // console.log(maxVel);
     if (maxVel > 1e-2) {
       setTimeout(this.update, 300);

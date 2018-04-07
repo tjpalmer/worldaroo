@@ -59,26 +59,43 @@ export class EditorBone extends Object3D {
 
 export class EditorGroup extends Object3D {
 
-  constructor() {
+  constructor(world: World) {
     super();
-    // Add the floor.
-    let floor = new Body();
-    floor.addShape(new Plane());
-    // floor.position.set(0, -0.1, 0);
-    floor.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -Math.PI / 2);
-    floor.collisionFilterGroup = 0x1;
-    floor.collisionFilterMask = 0x2;
-    this.world.addBody(floor);
-    this.floor = floor;
+    this.world = world;
   }
 
-  floor: Body;
+  floor?: Body = undefined;
 
   grabber = new Grabber(1);
 
-  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {}
+  matchBodiesToVisuals() {
+    // Make physics match scene graph.
+    let quat = new Quaternion();
+    let vec = new Vector3();
+    this.world.bodies.forEach(body => {
+      if (body instanceof EditorBody) {
+        let {visual} = body;
+        body.position.copy(visual.getWorldPosition(vec) as any);
+        visual.getWorldQuaternion(quat);
+        body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+      }
+    });
+  }
 
-  world = new World();
+  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
+    // console.log(ray.direction);
+    workPlane.position.copy(point);
+    // console.log(workPlane.getWorldQuaternion(new Quaternion()));
+    workPlane.setRotationFromQuaternion(
+      new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), ray.direction)
+    );
+    // console.log(workPlane.getWorldQuaternion(new Quaternion()));
+    workPlane.updateMatrixWorld(false);
+    // console.log(workPlane.matrixWorld);
+    this.matchBodiesToVisuals();
+  }
+
+  world: World;
 
 }
 
@@ -86,9 +103,8 @@ export class EditorGroup extends Object3D {
 // TODO Parameters, constraints, forks?
 export class Chain extends EditorGroup {
 
-  constructor(positions: number[]) {
-    super();
-    let {world} = this;
+  constructor(world: World, positions: number[]) {
+    super(world);
     let bones = [] as EditorBone[];
     let prevBone: EditorBone | undefined;
     positions.slice(1).forEach((y, i) => {
@@ -116,48 +132,14 @@ export class Chain extends EditorGroup {
     world.addBody(this.grabber);
   }
 
-  anchor?: Grabber = undefined;
-
   bones: EditorBone[];
-
-  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
-    // console.log(ray.direction);
-    workPlane.position.copy(point);
-    // console.log(workPlane.getWorldQuaternion(new Quaternion()));
-    workPlane.setRotationFromQuaternion(
-      new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), ray.direction)
-    );
-    // console.log(workPlane.getWorldQuaternion(new Quaternion()));
-    workPlane.updateMatrixWorld(false);
-    // console.log(workPlane.matrixWorld);
-    // Make physics match scene graph.
-    let quat = new Quaternion();
-    let vec = new Vector3();
-    this.world.bodies.forEach(body => {
-      if (body instanceof EditorBody) {
-        let {visual} = body;
-        body.position.copy(visual.getWorldPosition(vec) as any);
-        visual.getWorldQuaternion(quat);
-        body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
-      }
-    });
-    // Reset anchor.
-    if (this.anchor) {
-      this.anchor.release();
-      this.world.remove(this.anchor);
-    }
-    this.anchor = new Grabber();
-    this.world.addBody(this.anchor);
-    let first = this.bones[0];
-    this.anchor.grab(first.body, first.getWorldPosition(vec));
-  }
 
 }
 
 export class Creature extends EditorGroup {
 
   constructor() {
-    super();
+    super(new World());
     let {world} = this;
     // world.gravity.set(0, -10, 0);
     // Still broken typing here on bones.
@@ -207,7 +189,7 @@ export class Creature extends EditorGroup {
       // TODO Retain global limb rotation when moving spine, but local position.
       // Attach arms to bones[2], the upper torso.
       [-0.2, 0.2].forEach(z => {
-        let arm = new Chain([0, -0.35, -0.65, -0.85, -0.85]);
+        let arm = new Chain(world, [0, -0.35, -0.65, -0.85, -0.85]);
         if (false) {
           // T pose.
           arm.rotateX((z > 0 ? -1 : 1) * Math.PI / 2);
@@ -215,34 +197,49 @@ export class Creature extends EditorGroup {
         arm.position.z = z;
         bones[2].add(arm);
         this.limbs.push(arm);
+        world.addConstraint(new PointToPointConstraint(
+          bones[2].body, new Vec3(0, 0, z), arm.bones[0].body, Vec3.ZERO,
+        ));
       });
       // And legs attached to the pelvis.
       let pelvis = bones.slice(-1)[0];
       [-0.15, 0.15].forEach(z => {
-        let leg = new Chain([0, -0.45, -0.9, -1, -1]);
+        let leg = new Chain(world, [0, -0.45, -0.9, -1, -1]);
         leg.position.y = -pelvis.length;
         leg.position.z = z;
         pelvis.add(leg);
         this.limbs.push(leg);
+        world.addConstraint(new PointToPointConstraint(
+          pelvis.body, new Vec3(0, 0, z), leg.bones[0].body, Vec3.ZERO,
+        ));
       });
     }
+    this.matchBodiesToVisuals();
     world.addBody(this.grabber);
+    // Add the floor.
+    let floor = new Body();
+    floor.addShape(new Plane());
+    floor.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -Math.PI / 2);
+    floor.collisionFilterGroup = 0x1;
+    floor.collisionFilterMask = 0x2;
+    this.world.addBody(floor);
+    this.floor = floor;
   }
 
   limbs = new Array<Chain>();
 
-  prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
-    // Get the intersection point as the user expected from the click.
-    // We can't just intersect the center plane, because they might be looking
-    // from a front or back where the center plane would be far off.
-    // But push it to the center plane, so we act symmetrically on the object.
-    // First pretend our symmetry plane is offset to where we clicked so only
-    // relative plane motions matter.
-    workPlane.position.set(0, 0, point.z);
-    workPlane.lookAt(0, 0, 1);
-    workPlane.updateMatrixWorld(false);
-    point.z = 0;
-  }
+  // prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
+  //   // Get the intersection point as the user expected from the click.
+  //   // We can't just intersect the center plane, because they might be looking
+  //   // from a front or back where the center plane would be far off.
+  //   // But push it to the center plane, so we act symmetrically on the object.
+  //   // First pretend our symmetry plane is offset to where we clicked so only
+  //   // relative plane motions matter.
+  //   workPlane.position.set(0, 0, point.z);
+  //   workPlane.lookAt(0, 0, 1);
+  //   workPlane.updateMatrixWorld(false);
+  //   point.z = 0;
+  // }
 
 }
 
