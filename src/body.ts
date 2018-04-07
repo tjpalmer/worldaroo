@@ -64,8 +64,6 @@ export class EditorGroup extends Object3D {
     this.world = world;
   }
 
-  floor?: Body = undefined;
-
   grabber = new Grabber(1);
 
   matchBodiesToVisuals() {
@@ -177,14 +175,16 @@ export class Creature extends EditorGroup {
       // console.log(bone.body.position);
       prevBone = bone;
     });
-    // TODO Define any ground body elsewhere.
-    if (false) {
-      let ground = new Body();
-      ground.addShape(new Plane());
-      // TODO Get the rotation right.
-      ground.quaternion.setFromAxisAngle(new Vec3(0, 1, 0), Math.PI / 2);
-      world.addBody(ground);
-    }
+    // Add the floor.
+    // TODO Add this elsewhere?
+    let floor = new Body();
+    floor.addShape(new Plane());
+    floor.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -Math.PI / 2);
+    floor.collisionFilterGroup = 0x1;
+    floor.collisionFilterMask = 0x2;
+    this.world.addBody(floor);
+    this.floor = floor;
+    // Limbs.
     if (true) {
       // TODO Retain global limb rotation when moving spine, but local position.
       // Attach arms to bones[2], the upper torso.
@@ -212,19 +212,22 @@ export class Creature extends EditorGroup {
         world.addConstraint(new PointToPointConstraint(
           pelvis.body, new Vec3(0, 0, z), leg.bones[0].body, Vec3.ZERO,
         ));
+        // Stick feet to floor.
+        // The last is the zero-sized dangler.
+        let sole = leg.bones.slice(-1)[0];
+        world.addConstraint(new PointToPointConstraint(
+          floor, new Vec3(0, -z, 0), sole.body, Vec3.ZERO,
+        ));
+        // This one is the actual foot. Don't let the box collide with floor.
+        let foot = leg.bones.slice(-2)[0];
+        foot.body.collisionFilterGroup = 0;
       });
     }
     this.matchBodiesToVisuals();
     world.addBody(this.grabber);
-    // Add the floor.
-    let floor = new Body();
-    floor.addShape(new Plane());
-    floor.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -Math.PI / 2);
-    floor.collisionFilterGroup = 0x1;
-    floor.collisionFilterMask = 0x2;
-    this.world.addBody(floor);
-    this.floor = floor;
   }
+
+  floor: Body;
 
   limbs = new Array<Chain>();
 
