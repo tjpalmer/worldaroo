@@ -1,10 +1,9 @@
 import {
-  Body, Box, HingeConstraint, IBodyOptions, Plane, PointToPointConstraint,
-  World, Vec3,
+  Body, Box, IBodyOptions, Plane, PointToPointConstraint, Vec3, World,
 } from 'cannon';
 import {
-  Color, Geometry, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray,
-  SphereGeometry, Vector3,
+  Color, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray, SphereGeometry,
+  Vector3,
 } from 'three';
 
 export class EditorBody extends Body {
@@ -39,8 +38,8 @@ export class EditorBone extends Object3D {
     let body = new EditorBody(this, {
       angularDamping: damping, linearDamping: damping, mass: 1,
     });
-    body.collisionFilterGroup = 0;
-    body.collisionFilterMask = 0;
+    body.collisionFilterGroup = 0x2;
+    body.collisionFilterMask = 0x1;
     body.addShape(
       new Box(new Vec3(0.3 * radius, radius, 0.3 * radius)),
       new Vec3(0, -radius, 0),
@@ -59,6 +58,21 @@ export class EditorBone extends Object3D {
 }
 
 export class EditorGroup extends Object3D {
+
+  constructor() {
+    super();
+    // Add the floor.
+    let floor = new Body();
+    floor.addShape(new Plane());
+    // floor.position.set(0, -0.1, 0);
+    floor.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -Math.PI / 2);
+    floor.collisionFilterGroup = 0x1;
+    floor.collisionFilterMask = 0x2;
+    this.world.addBody(floor);
+    this.floor = floor;
+  }
+
+  floor: Body;
 
   grabber = new Grabber(1);
 
