@@ -141,40 +141,9 @@ export class Creature extends EditorGroup {
     let {world} = this;
     // world.gravity.set(0, -10, 0);
     // Still broken typing here on bones.
-    let bones = [] as EditorBone[];
-    let prevBone: EditorBone | undefined;
-    // Last bone length 0 because for some reason the last doesn't like to
-    // rotate when dragged by others?
-    // TODO Just a final size 0 physics body, not semantic bone.
-    let positions = [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1];
-    positions.slice(1).forEach((y, i) => {
-      let length = positions[i] - y;
-      let bone = new EditorBone(this, length);
-      if (prevBone) {
-        bone.position.y = -prevBone.length;
-        prevBone.add(bone);
-        // Given controlled grabber placement, points work as well as hinges.
-        // TODO Cone twist constraints!
-        // world.addConstraint(new HingeConstraint(prevBone.body, bone.body, {
-        //   axisA: new Vec3(0, 0, 1),
-        //   axisB: new Vec3(0, 0, 1),
-        //   pivotA: new Vec3(0, -prevBone.length, 0),
-        //   pivotB: Vec3.ZERO,
-        // }));
-        world.addConstraint(new PointToPointConstraint(
-          prevBone.body, new Vec3(0, -prevBone.length, 0), bone.body, Vec3.ZERO,
-        ));
-      } else {
-        bone.position.y = positions[0];
-        this.add(bone);
-      }
-      bones.push(bone);
-      let worldPos = bone.getWorldPosition(new Vector3());
-      bone.body.position.set(worldPos.x, worldPos.y, worldPos.z);
-      world.addBody(bone.body);
-      // console.log(bone.body.position);
-      prevBone = bone;
-    });
+    let spine = new Chain(world, [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1]);
+    let {bones} = spine;
+    this.add(bones[0]);
     // Add the floor.
     // TODO Add this elsewhere?
     let floor = new Body();
