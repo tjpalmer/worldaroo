@@ -4,7 +4,15 @@ import {
 import {
   Color, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray, SphereGeometry,
   Vector3,
+  Bone,
 } from 'three';
+
+export interface BoneOptions {
+  group: EditorGroup;
+  length: number;
+  offset: number;
+  radius: number;
+}
 
 export class EditorBody extends Body {
 
@@ -19,7 +27,7 @@ export class EditorBody extends Body {
 
 export class EditorBone extends Object3D {
 
-  constructor(group: EditorGroup, length: number) {
+  constructor({group, length, offset, radius: fleshRadius}: BoneOptions) {
     super();
     this.group = group;
     // TODO Also add editor tools on hover.
@@ -45,6 +53,18 @@ export class EditorBone extends Object3D {
       new Vec3(0, -radius, 0),
     );
     this.body = body;
+    this.addFlesh(offset, fleshRadius);
+  }
+
+  addFlesh(offset: number, widthRadius: number) {
+    let radius = 1.2 * this.length / 2;
+    let geometry = new SphereGeometry(radius, 8, 8);
+    geometry.scale(widthRadius / radius, 1, widthRadius / radius);
+    let color = this.color = new Color().setHSL((1/2 + 2/3) / 2, 0.2, 1/2);
+    let material = new MeshPhysicalMaterial({color, roughness: 0.75});
+    let mesh = new Mesh(geometry, material);
+    mesh.translateY(-radius);
+    this.add(mesh);
   }
 
   body: EditorBody;
@@ -101,13 +121,13 @@ export class EditorGroup extends Object3D {
 // TODO Parameters, constraints, forks?
 export class Chain extends EditorGroup {
 
-  constructor(world: World, positions: number[]) {
+  constructor({offset, positions, radius, world}: ChainOptions) {
     super(world);
     let bones = [] as EditorBone[];
     let prevBone: EditorBone | undefined;
     positions.slice(1).forEach((y, i) => {
       let length = positions[i] - y;
-      let bone = new EditorBone(this, length);
+      let bone = new EditorBone({group: this, length, offset, radius});
       if (prevBone) {
         bone.position.y = -prevBone.length;
         prevBone.add(bone);
@@ -120,6 +140,7 @@ export class Chain extends EditorGroup {
         this.add(bone);
       }
       bones.push(bone);
+      // Physics body.
       let worldPos = bone.getWorldPosition(new Vector3());
       bone.body.position.set(worldPos.x, worldPos.y, worldPos.z);
       world.addBody(bone.body);
@@ -134,6 +155,13 @@ export class Chain extends EditorGroup {
 
 }
 
+export interface ChainOptions {
+  offset: number;
+  positions: number[];
+  radius: number;
+  world: World;
+}
+
 export class Creature extends EditorGroup {
 
   constructor() {
@@ -141,7 +169,12 @@ export class Creature extends EditorGroup {
     let {world} = this;
     // world.gravity.set(0, -10, 0);
     // Still broken typing here on bones.
-    let spine = new Chain(world, [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1]);
+    let spine = new Chain({
+      offset: 0.05,
+      positions: [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1],
+      radius: 0.2,
+      world,
+    });
     let {bones} = spine;
     this.add(bones[0]);
     // Add the floor.
@@ -158,7 +191,12 @@ export class Creature extends EditorGroup {
       // TODO Retain global limb rotation when moving spine, but local position.
       // Attach arms to bones[2], the upper torso.
       [-0.2, 0.2].forEach(z => {
-        let arm = new Chain(world, [0, -0.35, -0.65, -0.85, -0.85]);
+        let arm = new Chain({
+          offset: 0,
+          positions: [0, -0.35, -0.65, -0.85, -0.85],
+          radius: 0.05,
+          world,
+        });
         if (false) {
           // T pose.
           arm.rotateX((z > 0 ? -1 : 1) * Math.PI / 2);
@@ -173,7 +211,12 @@ export class Creature extends EditorGroup {
       // And legs attached to the pelvis.
       let pelvis = bones.slice(-1)[0];
       [-0.15, 0.15].forEach(z => {
-        let leg = new Chain(world, [0, -0.45, -0.9, -1, -1]);
+        let leg = new Chain({
+          offset: -0.05,
+          positions: [0, -0.45, -0.9, -1, -1],
+          radius: 0.1,
+          world,
+        });
         leg.position.y = -pelvis.length;
         leg.position.z = z;
         pelvis.add(leg);
