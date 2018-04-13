@@ -3,8 +3,7 @@ import {
 } from 'cannon';
 import {
   Color, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray, SphereGeometry,
-  Vector3,
-  Bone,
+  SplineCurve, Vector2, Vector3,
 } from 'three';
 
 export interface BoneOptions {
@@ -172,11 +171,12 @@ export class Creature extends EditorGroup {
     let spine = new Chain({
       offset: 0.05,
       positions: [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1],
-      radius: 0.2,
+      radius: 0,
       world,
     });
     let {bones} = spine;
     this.add(bones[0]);
+    this.makeTorso();
     // Add the floor.
     // TODO Add this elsewhere?
     let floor = new Body();
@@ -242,6 +242,61 @@ export class Creature extends EditorGroup {
   floor: Body;
 
   limbs = new Array<Chain>();
+
+  makeTorso() {
+    let geometry = new SphereGeometry(1, 16, 32);
+    let curve = new SplineCurve([
+      new Vector2(0, 2),
+      new Vector2(0.1, 1.98),
+      new Vector2(0.12, 1.875),
+      new Vector2(0.1, 1.77),
+      new Vector2(0.07, 1.75),
+      new Vector2(0.07, 1.6875),
+      new Vector2(0.15, 1.625),
+      new Vector2(0.16, 1.5625),
+      new Vector2(0.16, 1.5),
+      new Vector2(0.15, 1.4375),
+      new Vector2(0.15, 1.375),
+      new Vector2(0.14, 1.3125),
+      new Vector2(0.12, 1.25),
+      new Vector2(0.13, 1.125),
+      new Vector2(0.13, 1),
+      new Vector2(0.08, 0.92),
+      new Vector2(0, 0.9),
+    ]);
+    // Update vertices.
+    let vec2 = new Vector2();
+    geometry.vertices.forEach(vertex => {
+      // let t = (vertex.y + 1) / 2;
+      let radius = vec2.set(vertex.x, vertex.z).length();
+      let u = (Math.PI / 2 + Math.atan2(vertex.y, radius)) / Math.PI;
+      // console.log(t, Math.atan2(vertex.y, radius), vertex.y, radius, vertex.x, vertex.z);
+      let angle = Math.atan2(vertex.x, vertex.z);
+      (curve as any).getPointAt(u, vec2);
+      // Global radius scaling.
+      vec2.x *= 0.8;
+      vertex.x = Math.cos(angle) * vec2.x;
+      vertex.y = vec2.y - 1;
+      vertex.z = Math.sin(angle) * vec2.x;
+      // radius = vec2.set(vertex.x, vertex.z).length();
+      // Partially align backs of circles.
+      vertex.x += vec2.x / 2;
+      // if (vertex.x < 0) {
+      //   vertex.x *= 0.5;
+      // }
+    });
+    console.log(geometry.faces.length);
+    // TODO Spline.
+    // Update normals.
+    geometry.computeFaceNormals();
+    geometry.computeVertexNormals();
+    // Build mesh.
+    let color = new Color().setHSL(5/6, 0.05, 0.4);
+    let material = new MeshPhysicalMaterial({color, roughness: 0.9});
+    let mesh = new Mesh(geometry, material);
+    mesh.position.set(-0.05, 1, 0);
+    this.add(mesh);
+  }
 
   // prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
   //   // Get the intersection point as the user expected from the click.
