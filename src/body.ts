@@ -56,6 +56,7 @@ export class EditorBone extends Object3D {
   }
 
   addFlesh(offset: number, widthRadius: number) {
+    if (!widthRadius) return;
     let radius = 1.2 * this.length / 2;
     let geometry = new SphereGeometry(radius, 8, 8);
     geometry.scale(widthRadius / radius, 1, widthRadius / radius);
@@ -176,7 +177,17 @@ export class Creature extends EditorGroup {
     });
     let {bones} = spine;
     this.add(bones[0]);
-    this.makeTorso(bones.slice(0, -1), [0.12, 0.07, 0.16, 0.14, 0.12, 0.13]);
+    this.makeTorso(
+      bones.slice(0, -1),
+      [
+        0,     0.12,  0.1, 0.07, 0.14, 0.16, 0.158,
+        0.15, 0.145, 0.14, 0.13, 0.14, 0
+      ],
+      [
+        1,        1,    1,    1,    1, 1.25,  1.25,
+        1.2,    1.2,  1.2,  1.2,  1.3, 1
+      ],
+    );
     // Add the floor.
     // TODO Add this elsewhere?
     let floor = new Body();
@@ -243,26 +254,49 @@ export class Creature extends EditorGroup {
 
   limbs = new Array<Chain>();
 
-  makeTorso(bones: EditorBone[], sizes: number[]) {
+  makeTorso(bones: EditorBone[], sizes: number[], widthScales: number[]) {
     let geometry = new SphereGeometry(1, 16, 32);
-    let curvePoints = [] as Vector2[];
+    let curvePointsX = [] as Vector2[];
+    let curvePointsZ = [] as Vector2[];
     let vec3 = new Vector3();
     bones.forEach((bone, index) => {
-      // Before final empty "bone".
-      let size = sizes[index];
-      let y = bone.getWorldPosition(vec3).y - bone.length / 2;
-      if (!index) {
-        curvePoints.push(new Vector2(0, y + bone.length / 2));
-        curvePoints.push(new Vector2(size * 0.5, y + 0.42 * bone.length));
+      let last = index == bones.length - 1;
+      index *= 2;
+      let pushCurvePoint = (x: number, y: number) => {
+        let pointX = new Vector2(x, y);
+        console.log(pointX.x, pointX.y);
+        curvePointsX.push(pointX);
+        let pointZ = pointX.clone();
+        pointZ.x *= widthScales[index];
+        curvePointsZ.push(pointZ);
       }
-      // console.log(y, bone.length, size);
-      curvePoints.push(new Vector2(size, y));
-      if (index == bones.length - 1) {
-        curvePoints.push(new Vector2(size * 0.5, y - 0.42 * bone.length));
-        curvePoints.push(new Vector2(0, y - bone.length / 2));
+      // Previous joint.
+      let size = sizes[index];
+      let y = bone.getWorldPosition(vec3).y;
+      console.log(index, size, y);
+      pushCurvePoint(size, y);
+      if (!index) {
+        // First.
+        // TODO Some circle math near end-points.
+        pushCurvePoint(sizes[index + 1] * 0.6, y + (0.42 - 0.5) * bone.length);
+      }
+      // Middle of bone.
+      index += 1;
+      size = sizes[index];
+      y -= bone.length / 2;
+      pushCurvePoint(size, y);
+      console.log(index, size, y);
+      // Last.
+      if (last) {
+        // TODO Some circle math near end-points.
+        pushCurvePoint(size * 0.6, y - 0.42 * bone.length);
+        pushCurvePoint(0, y - bone.length / 2);
       }
     });
-    let curve = new SplineCurve(curvePoints);
+    console.log(curvePointsX);
+    console.log(curvePointsZ);
+    let curveX = new SplineCurve(curvePointsX);
+    let curveZ = new SplineCurve(curvePointsZ);
     // let curve = new SplineCurve([
     //   new Vector2(0, 2),
     //   new Vector2(0.1, 1.98),
@@ -283,22 +317,25 @@ export class Creature extends EditorGroup {
     //   new Vector2(0, 0.9),
     // ]);
     // Update vertices.
-    let vec2 = new Vector2();
+    let vecX = new Vector2();
+    let vecZ = new Vector2();
     geometry.vertices.forEach(vertex => {
       // let t = (vertex.y + 1) / 2;
-      let radius = vec2.set(vertex.x, vertex.z).length();
+      let radius = vecX.set(vertex.x, vertex.z).length();
       let u = (Math.PI / 2 + Math.atan2(vertex.y, radius)) / Math.PI;
       // console.log(t, Math.atan2(vertex.y, radius), vertex.y, radius, vertex.x, vertex.z);
       let angle = Math.atan2(vertex.x, vertex.z);
-      (curve as any).getPointAt(u, vec2);
+      (curveX as any).getPointAt(u, vecX);
+      (curveZ as any).getPointAt(u, vecZ);
       // Global radius scaling.
-      vec2.x *= 0.8;
-      vertex.x = Math.cos(angle) * vec2.x;
-      vertex.y = vec2.y - 1;
-      vertex.z = Math.sin(angle) * vec2.x;
+      vecX.x *= 0.8;
+      vecZ.x *= 0.8;
+      vertex.x = Math.cos(angle) * vecX.x;
+      vertex.y = vecX.y - 1;
+      vertex.z = Math.sin(angle) * vecZ.x;
       // radius = vec2.set(vertex.x, vertex.z).length();
       // Partially align backs of circles.
-      // vertex.x += vec2.x / 2;
+      // vertex.x += vecX.x / 10;
       // if (vertex.x < 0) {
       //   vertex.x *= 0.5;
       // }
@@ -313,7 +350,7 @@ export class Creature extends EditorGroup {
     let material = new MeshPhysicalMaterial({color, roughness: 0.9});
     let mesh = new Mesh(geometry, material);
     mesh.position.set(0, 1, 0);
-    // mesh.position.x -= 0.3;
+    mesh.position.x += 0.01;
     this.add(mesh);
   }
 
