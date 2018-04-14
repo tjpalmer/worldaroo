@@ -176,7 +176,7 @@ export class Creature extends EditorGroup {
     });
     let {bones} = spine;
     this.add(bones[0]);
-    this.makeTorso();
+    this.makeTorso(bones.slice(0, -1), [0.12, 0.07, 0.16, 0.14, 0.12, 0.13]);
     // Add the floor.
     // TODO Add this elsewhere?
     let floor = new Body();
@@ -243,27 +243,45 @@ export class Creature extends EditorGroup {
 
   limbs = new Array<Chain>();
 
-  makeTorso() {
+  makeTorso(bones: EditorBone[], sizes: number[]) {
     let geometry = new SphereGeometry(1, 16, 32);
-    let curve = new SplineCurve([
-      new Vector2(0, 2),
-      new Vector2(0.1, 1.98),
-      new Vector2(0.12, 1.875),
-      new Vector2(0.1, 1.77),
-      new Vector2(0.07, 1.75),
-      new Vector2(0.07, 1.6875),
-      new Vector2(0.15, 1.625),
-      new Vector2(0.16, 1.5625),
-      new Vector2(0.16, 1.5),
-      new Vector2(0.15, 1.4375),
-      new Vector2(0.15, 1.375),
-      new Vector2(0.14, 1.3125),
-      new Vector2(0.12, 1.25),
-      new Vector2(0.13, 1.125),
-      new Vector2(0.13, 1),
-      new Vector2(0.08, 0.92),
-      new Vector2(0, 0.9),
-    ]);
+    let curvePoints = [] as Vector2[];
+    let vec3 = new Vector3();
+    bones.forEach((bone, index) => {
+      // Before final empty "bone".
+      let size = sizes[index];
+      let y = bone.getWorldPosition(vec3).y - bone.length / 2;
+      if (!index) {
+        curvePoints.push(new Vector2(0, y + bone.length / 2));
+        curvePoints.push(new Vector2(size * 0.5, y + 0.42 * bone.length));
+      }
+      // console.log(y, bone.length, size);
+      curvePoints.push(new Vector2(size, y));
+      if (index == bones.length - 1) {
+        curvePoints.push(new Vector2(size * 0.5, y - 0.42 * bone.length));
+        curvePoints.push(new Vector2(0, y - bone.length / 2));
+      }
+    });
+    let curve = new SplineCurve(curvePoints);
+    // let curve = new SplineCurve([
+    //   new Vector2(0, 2),
+    //   new Vector2(0.1, 1.98),
+    //   new Vector2(0.12, 1.875),
+    //   new Vector2(0.1, 1.77),
+    //   new Vector2(0.07, 1.75),
+    //   new Vector2(0.07, 1.6875),
+    //   new Vector2(0.15, 1.625),
+    //   new Vector2(0.16, 1.5625),
+    //   new Vector2(0.16, 1.5),
+    //   new Vector2(0.15, 1.4375),
+    //   new Vector2(0.15, 1.375),
+    //   new Vector2(0.14, 1.3125),
+    //   new Vector2(0.12, 1.25),
+    //   new Vector2(0.13, 1.125),
+    //   new Vector2(0.13, 1),
+    //   new Vector2(0.08, 0.92),
+    //   new Vector2(0, 0.9),
+    // ]);
     // Update vertices.
     let vec2 = new Vector2();
     geometry.vertices.forEach(vertex => {
@@ -280,12 +298,12 @@ export class Creature extends EditorGroup {
       vertex.z = Math.sin(angle) * vec2.x;
       // radius = vec2.set(vertex.x, vertex.z).length();
       // Partially align backs of circles.
-      vertex.x += vec2.x / 2;
+      // vertex.x += vec2.x / 2;
       // if (vertex.x < 0) {
       //   vertex.x *= 0.5;
       // }
     });
-    console.log(geometry.faces.length);
+    console.log(geometry.faces.length, geometry.vertices.length);
     // TODO Spline.
     // Update normals.
     geometry.computeFaceNormals();
@@ -294,7 +312,8 @@ export class Creature extends EditorGroup {
     let color = new Color().setHSL(5/6, 0.05, 0.4);
     let material = new MeshPhysicalMaterial({color, roughness: 0.9});
     let mesh = new Mesh(geometry, material);
-    mesh.position.set(-0.05, 1, 0);
+    mesh.position.set(0, 1, 0);
+    // mesh.position.x -= 0.3;
     this.add(mesh);
   }
 
