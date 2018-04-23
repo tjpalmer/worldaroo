@@ -235,6 +235,7 @@ export class App {
         // spam('-----------');
       }
     });
+    this.creature.updateBones();
     // if (group == this.creature) {
     //   // Restore global limb orientations.
     //   this.creature.limbs.forEach((limb, index) => {

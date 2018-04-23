@@ -2,8 +2,9 @@ import {
   Body, Box, IBodyOptions, Plane, PointToPointConstraint, Vec3, World,
 } from 'cannon';
 import {
-  Color, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray, SphereGeometry,
-  SplineCurve, Vector2, Vector3,
+  Bone, Color, Geometry, Mesh, MeshPhysicalMaterial, Object3D, Quaternion, Ray,
+  Skeleton, SkeletonHelper, SkinnedMesh, SphereGeometry, SplineCurve, Vector2,
+  Vector3, Vector4,
 } from 'three';
 
 export interface BoneOptions {
@@ -68,6 +69,8 @@ export class EditorBone extends Object3D {
   }
 
   body: EditorBody;
+
+  bone?: Bone = undefined;
 
   color: Color;
 
@@ -169,7 +172,7 @@ export class Creature extends EditorGroup {
     let {world} = this;
     // world.gravity.set(0, -10, 0);
     // Still broken typing here on bones.
-    let spine = new Chain({
+    let spine = this.spine = new Chain({
       offset: 0.05,
       positions: [2, 1.75, 1.625, 1.5, 1.375, 1.25, 1, 1],
       radius: 0,
@@ -255,7 +258,7 @@ export class Creature extends EditorGroup {
   limbs = new Array<Chain>();
 
   makeTorso(bones: EditorBone[], sizes: number[], widthScales: number[]) {
-    let geometry = new SphereGeometry(1, 16, 32);
+    let geometry = new SphereGeometry(1, 8, 16);
     let curvePointsX = [] as Vector2[];
     let curvePointsZ = [] as Vector2[];
     let vec3 = new Vector3();
@@ -264,7 +267,7 @@ export class Creature extends EditorGroup {
       index *= 2;
       let pushCurvePoint = (x: number, y: number) => {
         let pointX = new Vector2(x, y);
-        console.log(pointX.x, pointX.y);
+        // console.log(pointX.x, pointX.y);
         curvePointsX.push(pointX);
         let pointZ = pointX.clone();
         pointZ.x *= widthScales[index];
@@ -273,7 +276,7 @@ export class Creature extends EditorGroup {
       // Previous joint.
       let size = sizes[index];
       let y = bone.getWorldPosition(vec3).y;
-      console.log(index, size, y);
+      // console.log(index, size, y);
       pushCurvePoint(size, y);
       if (!index) {
         // First.
@@ -285,7 +288,7 @@ export class Creature extends EditorGroup {
       size = sizes[index];
       y -= bone.length / 2;
       pushCurvePoint(size, y);
-      console.log(index, size, y);
+      // console.log(index, size, y);
       // Last.
       if (last) {
         // TODO Some circle math near end-points.
@@ -293,37 +296,16 @@ export class Creature extends EditorGroup {
         pushCurvePoint(0, y - bone.length / 2);
       }
     });
-    console.log(curvePointsX);
-    console.log(curvePointsZ);
+    // console.log(curvePointsX);
+    // console.log(curvePointsZ);
     let curveX = new SplineCurve(curvePointsX);
     let curveZ = new SplineCurve(curvePointsZ);
-    // let curve = new SplineCurve([
-    //   new Vector2(0, 2),
-    //   new Vector2(0.1, 1.98),
-    //   new Vector2(0.12, 1.875),
-    //   new Vector2(0.1, 1.77),
-    //   new Vector2(0.07, 1.75),
-    //   new Vector2(0.07, 1.6875),
-    //   new Vector2(0.15, 1.625),
-    //   new Vector2(0.16, 1.5625),
-    //   new Vector2(0.16, 1.5),
-    //   new Vector2(0.15, 1.4375),
-    //   new Vector2(0.15, 1.375),
-    //   new Vector2(0.14, 1.3125),
-    //   new Vector2(0.12, 1.25),
-    //   new Vector2(0.13, 1.125),
-    //   new Vector2(0.13, 1),
-    //   new Vector2(0.08, 0.92),
-    //   new Vector2(0, 0.9),
-    // ]);
     // Update vertices.
     let vecX = new Vector2();
     let vecZ = new Vector2();
     geometry.vertices.forEach(vertex => {
-      // let t = (vertex.y + 1) / 2;
       let radius = vecX.set(vertex.x, vertex.z).length();
       let u = (Math.PI / 2 + Math.atan2(vertex.y, radius)) / Math.PI;
-      // console.log(t, Math.atan2(vertex.y, radius), vertex.y, radius, vertex.x, vertex.z);
       let angle = Math.atan2(vertex.x, vertex.z);
       (curveX as any).getPointAt(u, vecX);
       (curveZ as any).getPointAt(u, vecZ);
@@ -331,27 +313,91 @@ export class Creature extends EditorGroup {
       vecX.x *= 0.8;
       vecZ.x *= 0.8;
       vertex.x = Math.cos(angle) * vecX.x;
-      vertex.y = vecX.y - 1;
+      vertex.y = vecX.y; // - 1;
       vertex.z = Math.sin(angle) * vecZ.x;
-      // radius = vec2.set(vertex.x, vertex.z).length();
+        // radius = vec2.set(vertex.x, vertex.z).length();
       // Partially align backs of circles.
       // vertex.x += vecX.x / 10;
       // if (vertex.x < 0) {
       //   vertex.x *= 0.5;
       // }
     });
-    console.log(geometry.faces.length, geometry.vertices.length);
-    // TODO Spline.
+    // console.log(geometry.faces.length, geometry.vertices.length);
+    let skeleton = this.makeTorsoSkeleton(bones, geometry);
     // Update normals.
     geometry.computeFaceNormals();
     geometry.computeVertexNormals();
     // Build mesh.
     let color = new Color().setHSL(5/6, 0.05, 0.4);
     let material = new MeshPhysicalMaterial({color, roughness: 0.9});
-    let mesh = new Mesh(geometry, material);
-    mesh.position.set(0, 1, 0);
+    material.skinning = true;
+    let mesh = new SkinnedMesh(geometry, material);
+    // mesh.position.set(0, 1, 0);
     mesh.position.x += 0.01;
+    mesh.add(skeleton.bones[0]);
+    mesh.bind(skeleton);
     this.add(mesh);
+    this.add(new SkeletonHelper(mesh));
+  }
+
+  makeTorsoSkeleton(editorBones: EditorBone[], torso: Geometry) {
+    let prevBone: Bone | undefined = undefined;
+    let boneYs = [] as number[];
+    let halfLengths = editorBones.map(bone => bone.length / 2);
+    let bones = editorBones.map((editorBone, index) => {
+      let bone = new (Bone as any)() as Bone;
+      bone.position.y = editorBone.position.y; // - editorBone.length / 2;
+      if (prevBone) {
+        // bone.position.y += editorBones[index - 1].length / 2;
+        prevBone.add(bone);
+      }
+      prevBone = bone;
+      boneYs.push(bone.getWorldPosition(new Vector3).y - editorBone.length / 2);
+      editorBone.bone = bone;
+      return bone;
+    });
+    let skinIndices = torso.skinIndices as any as Array<Vector4>;
+    let skinWeights = torso.skinWeights as any as Array<Vector4>;
+    let counts = new Array<number>(bones.length + 1);
+    let lastBoneY = boneYs.slice(-1)[0];
+    for (let vertex of torso.vertices) {
+      let {y} = vertex;
+      if (y >= boneYs[0]) {
+        skinIndices.push(new Vector4());
+        skinWeights.push(new Vector4(1));
+      } else if (y < lastBoneY) {
+        skinIndices.push(new Vector4(boneYs.length - 1));
+        skinWeights.push(new Vector4(1));
+      } else {
+        // TODO Avoid inner loop somehow?
+        for (let index = 1; index < boneYs.length; ++index) {
+          let y0 = boneYs[index - 1];
+          let y1 = boneYs[index];
+          if (y > y1) {
+            let jointY = y1 + halfLengths[index];
+            // console.log('y > y1', y, y0, y1, jointY);
+            let weight0: number, weight1: number;
+            if (y > jointY) {
+              weight1 = (y0 - y) / (y0 - jointY) / 2;
+              weight0 = 1 - weight1;
+            } else {
+              weight0 = (y - y1) / (jointY - y1) / 2;
+              weight1 = 1 - weight0;
+            }
+            skinIndices.push(new Vector4(index - 1, index));
+            skinWeights.push(new Vector4(weight0, weight1));
+            break;
+          }
+        }
+      }
+    }
+    torso.vertices.forEach((vertex, index) => {
+      let skindex = skinIndices[index];
+      let skinWeight = skinWeights[index];
+      // console.log(vertex.y, skindex.x, skindex.y, skinWeight.x, skinWeight.y);
+    });
+    // console.log(bones);
+    return new Skeleton(bones);
   }
 
   // prepareWorkPlane(workPlane: Mesh, point: Vector3, ray: Ray) {
@@ -366,6 +412,23 @@ export class Creature extends EditorGroup {
   //   workPlane.updateMatrixWorld(false);
   //   point.z = 0;
   // }
+
+  spine: Chain;
+
+  updateBones() {
+    this.spine.bones.forEach(editorBone => {
+      let {bone} = editorBone;
+      if (bone) {
+        bone.matrix.copy(editorBone.matrix);
+        bone.position.copy(editorBone.position);
+        bone.quaternion.copy(editorBone.quaternion);
+        // console.log(editorBone.matrix);
+        // console.log(bone.matrix);
+        bone.updateMatrixWorld(false);
+        // console.log(bone.getWorldPosition(new Vector3()))
+      }
+    });
+  }
 
 }
 
