@@ -419,9 +419,7 @@ export class Creature extends EditorGroup {
     this.spine.bones.forEach(editorBone => {
       let {bone} = editorBone;
       if (bone) {
-        bone.matrix.copy(editorBone.matrix);
-        bone.position.copy(editorBone.position);
-        bone.quaternion.copy(editorBone.quaternion);
+        editorBone.matrix.decompose(bone.position, bone.quaternion, bone.scale);
         // console.log(editorBone.matrix);
         // console.log(bone.matrix);
         bone.updateMatrixWorld(false);
